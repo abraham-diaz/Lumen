@@ -7,3 +7,4 @@ gitpython
 watchdog
 tree-sitter 
 tree-sitter-python
+llama-cpp-python

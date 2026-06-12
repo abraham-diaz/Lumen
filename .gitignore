@@ -1,2 +1,8 @@
 # Entorno 
 .venv/*
+
+#Models
+models/*
+
+# python cache
+__pycache__/
