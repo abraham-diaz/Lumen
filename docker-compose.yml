@@ -1,0 +1,15 @@
+services:
+   db:
+    image: pgvector/pgvector:pg17
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=lumen
+      - POSTGRES_PASSWORD=lumen_password
+      - POSTGRES_DB=lumen
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    
+volumes:
+  postgres_data:
