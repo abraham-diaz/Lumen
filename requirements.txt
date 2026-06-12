@@ -5,3 +5,5 @@ pgvector
 sentence-transformers
 gitpython
 watchdog
+tree-sitter 
+tree-sitter-python

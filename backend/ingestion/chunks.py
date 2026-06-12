@@ -1,5 +1,6 @@
 from backend.db.connection import get_connection
 
+
 def add_chunk(file_id, content, start_line, end_line, chunk_type, embedding= None):
     with get_connection() as conn:
         with conn.cursor() as cur:
