@@ -6,3 +6,6 @@ models/*
 
 # python cache
 __pycache__/
+
+# PYC
+*.pyc
