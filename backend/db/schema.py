@@ -20,17 +20,29 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 CREATE TABLE IF NOT EXISTS chunks (
-    id         SERIAL PRIMARY KEY,
-    file_id    INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
-    content    TEXT NOT NULL,
-    start_line INTEGER,
-    end_line   INTEGER,
-    chunk_type TEXT,
-    embedding  vector(384)
+    id          SERIAL PRIMARY KEY,
+    file_id     INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+    content     TEXT NOT NULL,
+    start_line  INTEGER,
+    end_line    INTEGER,
+    chunk_type  TEXT,
+    embedding   vector(384),
+    content_tsv tsvector GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED
 );
 
 CREATE INDEX IF NOT EXISTS chunks_embedding_idx
     ON chunks USING hnsw (embedding vector_cosine_ops);
+"""
+
+# CREATE TABLE IF NOT EXISTS no toca tablas que ya existen, así que para
+# bases de datos creadas antes de añadir content_tsv hace falta esta migración.
+MIGRATION_SQL = """
+ALTER TABLE chunks
+    ADD COLUMN IF NOT EXISTS content_tsv tsvector
+    GENERATED ALWAYS AS (to_tsvector('simple', content)) STORED;
+
+CREATE INDEX IF NOT EXISTS chunks_content_tsv_idx
+    ON chunks USING GIN (content_tsv);
 """
 
 if __name__ == "__main__":
@@ -42,5 +54,6 @@ if __name__ == "__main__":
         password="lumen_password",
     ) as conn:
         conn.execute(SQL)
+        conn.execute(MIGRATION_SQL)
         conn.commit()
     print("Schema created successfully.")

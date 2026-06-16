@@ -14,4 +14,10 @@ def add_chunk(file_id, content, start_line, end_line, chunk_type, embedding= Non
             chunk_id = result[0]
             conn.commit()
             return chunk_id
-        
+
+
+def delete_chunks_for_file(file_id):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM chunks WHERE file_id = %s", (file_id,))
+        conn.commit()
