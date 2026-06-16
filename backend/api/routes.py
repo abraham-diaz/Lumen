@@ -21,6 +21,7 @@ def _force_remove(func, path, exc):
 
 class QueryRequest(BaseModel):
     query: str
+    project_name: str
 
 class IndexRequest(BaseModel):
     project_name: str
@@ -28,8 +29,7 @@ class IndexRequest(BaseModel):
 
 @router.post("/query")
 def query_endpoint(request: QueryRequest):
-    answer = query(request.query)
-    return {"answer": answer}
+    return query(request.query, request.project_name)
 
 
 @router.post("/index")
