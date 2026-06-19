@@ -1,64 +1,147 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/abraham-diaz/Lumen/main/frontend/assets/logo.svg" alt="Lumen Logo" width="100"/>
+
 # Lumen
 
-RAG system for indexing and querying code from personal projects.
+### RAG system for querying your own codebase
 
-## Stack
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![pgvector](https://img.shields.io/badge/pgvector-semantic_search-4169E1?style=for-the-badge) ![Gemma](https://img.shields.io/badge/Gemma_2_2B-local_LLM-FF6F00?style=for-the-badge&logo=google&logoColor=white) ![sentence-transformers](https://img.shields.io/badge/MiniLM--L6--v2-embeddings-blueviolet?style=for-the-badge)
 
-- **FastAPI** — REST API
-- **PostgreSQL + pgvector** — storage, semantic search and full-text search
-- **sentence-transformers** (MiniLM-L6-v2) — embedding generation (384-dim)
-- **llama-cpp-python + Gemma 2 2B (Q4_K_M, GGUF)** — local LLM for answer generation, runs in-process (no Ollama server)
-- **tree-sitter** — smart chunking by function/class
-- **GitPython** — clones a repo URL into a temporary folder for indexing
+</div>
 
-## Ingestion flow
+---
 
-`POST /index` receives a `project_name` and a `git_url`:
+## What is Lumen?
 
-1. Clones the repo to a temporary folder (`tempfile.mkdtemp()`)
-2. Registers the project, using the git URL as its persistent identifier
-3. Walks the clone looking for `.py` files, chunking each one with tree-sitter
-4. Embeds every chunk (MiniLM) and stores it in `chunks`, replacing any previous chunks for that file
-5. Deletes the temporary clone — only chunks + embeddings persist, never the raw repo
+Lumen is a local RAG (Retrieval-Augmented Generation) system that indexes and queries code from your own Git repositories. Point it at any repo, and you can ask natural language questions about the code — it retrieves the most relevant chunks and generates an answer using a local LLM, with exact source references.
 
-Re-indexing the same project re-clones, re-chunks and replaces existing chunks (no duplicates).
+No cloud. No API keys. Everything runs on your own machine.
 
-## Query flow
+---
 
-`POST /query` receives a `query` and a `project_name`:
+## Features
 
-1. Embeds the question (MiniLM)
-2. Hybrid search scoped to that project only:
-   - vector similarity (pgvector, HNSW, cosine)
-   - full-text search (Postgres `tsvector`/GIN, `ts_rank`)
-   - both rankings merged via **Reciprocal Rank Fusion**
-3. Top chunks become the context (with chunk type + line numbers) passed to Gemma, with an instruction to answer only from that context
-4. Returns `{ "answer": "...", "sources": [...] }` — `sources` is the exact retrieved code, untouched by the model
+- **Smart chunking** — splits code by function and class using `tree-sitter`, not by arbitrary line count
+- **Hybrid search** — combines vector similarity (pgvector HNSW) and full-text search (PostgreSQL `tsvector`) merged via **Reciprocal Rank Fusion**
+- **Local LLM** — runs Gemma 2 2B (Q4_K_M GGUF) in-process via `llama-cpp-python`, no Ollama server needed
+- **Source citations** — every answer includes the exact retrieved code chunks with file, type and line numbers
+- **Re-indexing safe** — indexing the same project again replaces existing chunks, no duplicates
+- **Dockerized** — PostgreSQL + pgvector runs in a container, zero manual DB setup
 
-## Database
+---
 
-Three tables: `projects` → `files` → `chunks`, CASCADE deletes down the hierarchy.
+## Tech Stack
 
-- `chunks.embedding` — `vector(384)`, HNSW index (`vector_cosine_ops`)
-- `chunks.content_tsv` — generated `tsvector` column, GIN index
+| Layer | Technology |
+|---|---|
+| API | FastAPI |
+| Database | PostgreSQL + pgvector |
+| Embeddings | sentence-transformers · MiniLM-L6-v2 (384-dim) |
+| LLM | Gemma 2 2B · Q4_K_M GGUF · llama-cpp-python |
+| Code parsing | tree-sitter |
+| Repo cloning | GitPython |
+| Infrastructure | Docker · Docker Compose |
 
-## Setup
+---
+
+## Architecture
+
+```
+POST /index  (project_name, git_url)
+│
+├── Clone repo → tempdir (GitPython)
+├── Walk .py files → chunk by function/class (tree-sitter)
+├── Embed each chunk (MiniLM-L6-v2)
+├── Store in PostgreSQL: projects → files → chunks
+│   ├── chunks.embedding  vector(384)  HNSW index
+│   └── chunks.content_tsv  tsvector   GIN index
+└── Delete tempdir — only embeddings persist
+
+
+POST /query  (query, project_name)
+│
+├── Embed query (MiniLM-L6-v2)
+├── Hybrid search scoped to project
+│   ├── Vector similarity  (pgvector · cosine · HNSW)
+│   ├── Full-text search   (tsvector · GIN · ts_rank)
+│   └── Merge rankings     (Reciprocal Rank Fusion)
+├── Top chunks → context for Gemma 2 2B
+└── Return { answer, sources }
+```
+
+---
+
+## Database Schema
+
+```
+projects
+  └── files (CASCADE)
+        └── chunks (CASCADE)
+              ├── embedding   vector(384)   — HNSW (cosine)
+              └── content_tsv tsvector      — GIN index
+```
+
+---
+
+## Getting Started
+
+### Requirements
+
+- Docker & Docker Compose
+- Python 3.10+
+- `models/gemma-2-2b-it-q4_k_m.gguf` — download from [HuggingFace](https://huggingface.co/google/gemma-2-2b-it-GGUF) and place in the `models/` folder
+
+### Setup
 
 ```bash
-docker compose up -d                  # PostgreSQL + pgvector, port 5433
+# 1. Start PostgreSQL + pgvector
+docker compose up -d
+
+# 2. Install Python dependencies
 pip install -r requirements.txt
-python backend/db/schema.py           # creates tables + indexes
+
+# 3. Create tables and indexes
+python backend/db/schema.py
+
+# 4. Start the API
 uvicorn main:app --reload
 ```
 
-Requires `models/gemma-2-2b-it-q4_k_m.gguf` (not committed — gitignored).
+### Index a repository
 
-## Not implemented yet
+```bash
+curl -X POST http://localhost:8000/index \
+  -H "Content-Type: application/json" \
+  -d '{"project_name": "my-project", "git_url": "https://github.com/user/repo"}'
+```
 
-- **Watchdog** — automatic re-indexing on file change
-- Listing / deleting indexed projects
-- Skipping unchanged files on re-index (`files.file_hash` exists but is unused)
+### Query your code
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"project_name": "my-project", "query": "How does authentication work?"}'
+```
+
+---
 
 ## Deployment
 
-VPS: 4 vCores, 4GB RAM, 120GB NVMe.
+Tested on a VPS with 4 vCores · 4 GB RAM · 120 GB NVMe. Gemma 2 2B Q4 runs comfortably within that spec.
+
+---
+
+## Roadmap
+
+- [ ] Watchdog — automatic re-indexing on file change
+- [ ] Support for additional languages (TypeScript, JavaScript, Go...)
+- [ ] Skip unchanged files on re-index using `files.file_hash`
+- [ ] List and delete indexed projects via API
+- [ ] Multi-repo queries
+
+---
+
+## License
+
+MIT

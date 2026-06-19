@@ -28,6 +28,7 @@ async function indexProject() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail ?? JSON.stringify(data));
     showStatus(out, `Listo — ${data.files_indexed} archivos indexados (id: ${data.project_id}).`, 'ok');
+    loadProjects();
   } catch (e) {
     showStatus(out, `Error: ${e.message}`, 'err');
   } finally {
