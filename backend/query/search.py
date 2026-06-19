@@ -6,23 +6,30 @@ from backend.db.connection import get_connection
 RRF_K = 60
 
 
-def _vector_search(cur, query_embedding, candidates):
+def _vector_search(cur, query_embedding, project_name, candidates):
     cur.execute(
-        "SELECT id, content, chunk_type, start_line, end_line "
-        "FROM chunks ORDER BY embedding <=> %s LIMIT %s",
-        (str(query_embedding.tolist()), candidates),
+        "SELECT chunks.id, chunks.content, chunks.chunk_type, chunks.start_line, chunks.end_line "
+        "FROM chunks "
+        "JOIN files ON chunks.file_id = files.id "
+        "JOIN projects ON files.project_id = projects.id "
+        "WHERE projects.name = %s "
+        "ORDER BY chunks.embedding <=> %s LIMIT %s",
+        (project_name, str(query_embedding.tolist()), candidates),
     )
     return cur.fetchall()
 
 
-def _text_search(cur, query, candidates):
+def _text_search(cur, query, project_name, candidates):
     cur.execute(
-        "SELECT id, content, chunk_type, start_line, end_line "
+        "SELECT chunks.id, chunks.content, chunks.chunk_type, chunks.start_line, chunks.end_line "
         "FROM chunks "
-        "WHERE content_tsv @@ plainto_tsquery('simple', %s) "
-        "ORDER BY ts_rank(content_tsv, plainto_tsquery('simple', %s)) DESC "
+        "JOIN files ON chunks.file_id = files.id "
+        "JOIN projects ON files.project_id = projects.id "
+        "WHERE projects.name = %s "
+        "AND chunks.content_tsv @@ plainto_tsquery('simple', %s) "
+        "ORDER BY ts_rank(chunks.content_tsv, plainto_tsquery('simple', %s)) DESC "
         "LIMIT %s",
-        (query, query, candidates),
+        (project_name, query, query, candidates),
     )
     return cur.fetchall()
 
@@ -46,12 +53,12 @@ def _reciprocal_rank_fusion(*rankings, top_k):
     return [rows_by_id[cid][1:] for cid in best_ids[:top_k]]
 
 
-def search(query, top_k=5, candidates=20):
+def search(query, project_name, top_k=5, candidates=20):
     query_embedding = get_embedding(query)
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            vector_results = _vector_search(cur, query_embedding, candidates)
-            text_results = _text_search(cur, query, candidates)
+            vector_results = _vector_search(cur, query_embedding, project_name, candidates)
+            text_results = _text_search(cur, query, project_name, candidates)
 
     return _reciprocal_rank_fusion(vector_results, text_results, top_k=top_k)

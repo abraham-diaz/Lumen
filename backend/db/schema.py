@@ -43,16 +43,13 @@ ALTER TABLE chunks
 
 CREATE INDEX IF NOT EXISTS chunks_content_tsv_idx
     ON chunks USING GIN (content_tsv);
+
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS description TEXT;
 """
 
 if __name__ == "__main__":
-    with psycopg.connect(
-        host="localhost",
-        port=5433,
-        dbname="lumen",
-        user="lumen",
-        password="lumen_password",
-    ) as conn:
+    from backend.db.connection import get_connection
+    with get_connection() as conn:
         conn.execute(SQL)
         conn.execute(MIGRATION_SQL)
         conn.commit()
