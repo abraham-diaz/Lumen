@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lumen</title>
+  <link rel="icon" type="image/svg+xml" href="/static/assets/logo.svg" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<header>
+  <img src="/static/assets/logo.svg" alt="Lumen logo" />
+  <h1>Lumen</h1>
+  <p>RAG sobre tus proyectos</p>
+</header>
+
+<div class="card">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('index', this)">Indexar</button>
+    <button class="tab"        onclick="switchTab('query',  this)">Consultar</button>
+  </div>
+
+  <!-- INDEXAR -->
+  <div id="panel-index" class="panel active">
+    <label for="idx-name">Nombre del proyecto</label>
+    <input id="idx-name" type="text" placeholder="mi-proyecto" />
+
+    <label for="idx-url">URL del repositorio Git</label>
+    <input id="idx-url" type="text" placeholder="https://github.com/usuario/repo" />
+
+    <div class="btn-row">
+      <button id="idx-btn" class="primary" onclick="indexProject()">Indexar</button>
+    </div>
+
+    <div id="idx-result" class="result"></div>
+  </div>
+
+  <!-- CONSULTAR -->
+  <div id="panel-query" class="panel">
+    <label for="q-name">Nombre del proyecto</label>
+    <input id="q-name" type="text" placeholder="mi-proyecto" />
+
+    <label for="q-query">Pregunta</label>
+    <textarea id="q-query" placeholder="¿Cómo funciona el módulo de autenticación?"></textarea>
+
+    <div class="btn-row">
+      <button id="q-btn" class="primary" onclick="queryProject()">Preguntar</button>
+    </div>
+
+    <div id="q-result" class="result"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
