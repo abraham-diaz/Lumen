@@ -1,90 +1,147 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/abraham-diaz/Lumen/main/frontend/assets/logo.svg" alt="Lumen Logo" width="100"/>
+
 # Lumen
 
-RAG system for indexing and querying code from personal projects.
+### RAG system for querying your own codebase
 
-## Stack
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white) ![pgvector](https://img.shields.io/badge/pgvector-semantic_search-4169E1?style=for-the-badge) ![Gemma](https://img.shields.io/badge/Gemma_2_2B-local_LLM-FF6F00?style=for-the-badge&logo=google&logoColor=white) ![sentence-transformers](https://img.shields.io/badge/MiniLM--L6--v2-embeddings-blueviolet?style=for-the-badge)
 
-- **FastAPI** — REST API + frontend estático
-- **PostgreSQL + pgvector** — almacenamiento, búsqueda semántica y full-text
-- **sentence-transformers** (MiniLM-L6-v2) — embeddings 384-dim
-- **llama-cpp-python + Gemma 2 2B (Q4_K_M, GGUF)** — LLM local, corre in-process
-- **tree-sitter** — chunking por función/clase
-- **GitPython** — clona repos remotos para indexarlos
+</div>
 
-## Ingestion flow
+---
 
-`POST /index` recibe `project_name` y `git_url`:
+## What is Lumen?
 
-1. Clona el repo en un directorio temporal
-2. Registra el proyecto usando la URL como identificador único
-3. Recorre el clon buscando `.py`, chunkea con tree-sitter
-4. Embeds cada chunk (MiniLM) y lo guarda en `chunks`, reemplazando los anteriores
-5. Genera una descripción del proyecto con el LLM y la guarda en `projects.description`
-6. Borra el clon temporal — solo persisten chunks + embeddings
+Lumen is a local RAG (Retrieval-Augmented Generation) system that indexes and queries code from your own Git repositories. Point it at any repo, and you can ask natural language questions about the code — it retrieves the most relevant chunks and generates an answer using a local LLM, with exact source references.
 
-Re-indexar el mismo proyecto re-clona, re-chunkea y reemplaza (sin duplicados).
+No cloud. No API keys. Everything runs on your own machine.
 
-## Query flow
+---
 
-`POST /query` recibe `query` y `project_name`:
+## Features
 
-1. Embeds la pregunta (MiniLM)
-2. Búsqueda híbrida limitada a ese proyecto:
-   - Similitud vectorial (pgvector, HNSW, cosine)
-   - Full-text (Postgres `tsvector`/GIN, `ts_rank`)
-   - Rankings fusionados con **Reciprocal Rank Fusion**
-3. Los top chunks se pasan como contexto a Gemma con instrucción de responder solo desde ese contexto
-4. Devuelve `{ "answer": "...", "sources": [...] }`
+- **Smart chunking** — splits code by function and class using `tree-sitter`, not by arbitrary line count
+- **Hybrid search** — combines vector similarity (pgvector HNSW) and full-text search (PostgreSQL `tsvector`) merged via **Reciprocal Rank Fusion**
+- **Local LLM** — runs Gemma 2 2B (Q4_K_M GGUF) in-process via `llama-cpp-python`, no Ollama server needed
+- **Source citations** — every answer includes the exact retrieved code chunks with file, type and line numbers
+- **Re-indexing safe** — indexing the same project again replaces existing chunks, no duplicates
+- **Dockerized** — PostgreSQL + pgvector runs in a container, zero manual DB setup
 
-## Other endpoints
+---
 
-- `GET /projects` — lista proyectos indexados con su descripción generada por el LLM
+## Tech Stack
 
-## Database
+| Layer | Technology |
+|---|---|
+| API | FastAPI |
+| Database | PostgreSQL + pgvector |
+| Embeddings | sentence-transformers · MiniLM-L6-v2 (384-dim) |
+| LLM | Gemma 2 2B · Q4_K_M GGUF · llama-cpp-python |
+| Code parsing | tree-sitter |
+| Repo cloning | GitPython |
+| Infrastructure | Docker · Docker Compose |
 
-Tres tablas: `projects` → `files` → `chunks`, CASCADE deletes.
+---
 
-- `chunks.embedding` — `vector(384)`, HNSW index (`vector_cosine_ops`)
-- `chunks.content_tsv` — columna `tsvector` generada, GIN index
-- `projects.description` — descripción generada automáticamente al indexar
+## Architecture
 
-## Deploy con Docker
+```
+POST /index  (project_name, git_url)
+│
+├── Clone repo → tempdir (GitPython)
+├── Walk .py files → chunk by function/class (tree-sitter)
+├── Embed each chunk (MiniLM-L6-v2)
+├── Store in PostgreSQL: projects → files → chunks
+│   ├── chunks.embedding  vector(384)  HNSW index
+│   └── chunks.content_tsv  tsvector   GIN index
+└── Delete tempdir — only embeddings persist
 
-```bash
-docker-compose up --build -d
+
+POST /query  (query, project_name)
+│
+├── Embed query (MiniLM-L6-v2)
+├── Hybrid search scoped to project
+│   ├── Vector similarity  (pgvector · cosine · HNSW)
+│   ├── Full-text search   (tsvector · GIN · ts_rank)
+│   └── Merge rankings     (Reciprocal Rank Fusion)
+├── Top chunks → context for Gemma 2 2B
+└── Return { answer, sources }
 ```
 
-Levanta PostgreSQL + pgvector y la API. En el primer arranque ejecuta automáticamente la migración del schema.
+---
 
-Requiere `models/gemma-2-2b-it-q4_k_m.gguf` montado en `./models/` (no está en git).
+## Database Schema
 
-Variables de entorno (con defaults para dev local):
+```
+projects
+  └── files (CASCADE)
+        └── chunks (CASCADE)
+              ├── embedding   vector(384)   — HNSW (cosine)
+              └── content_tsv tsvector      — GIN index
+```
 
-| Variable | Default | Docker |
-|---|---|---|
-| `DB_HOST` | `localhost` | `db` |
-| `DB_PORT` | `5433` | `5432` |
-| `DB_NAME` | `lumen` | `lumen` |
-| `DB_USER` | `lumen` | `lumen` |
-| `DB_PASSWORD` | `lumen_password` | `lumen_password` |
+---
 
-## Dev local
+## Getting Started
+
+### Requirements
+
+- Docker & Docker Compose
+- Python 3.10+
+- `models/gemma-2-2b-it-q4_k_m.gguf` — download from [HuggingFace](https://huggingface.co/google/gemma-2-2b-it-GGUF) and place in the `models/` folder
+
+### Setup
 
 ```bash
-docker-compose up -d db         # solo PostgreSQL
+# 1. Start PostgreSQL + pgvector
+docker compose up -d
+
+# 2. Install Python dependencies
 pip install -r requirements.txt
-python -m backend.db.schema     # crea tablas + indexes
+
+# 3. Create tables and indexes
+python backend/db/schema.py
+
+# 4. Start the API
 uvicorn main:app --reload
 ```
 
-## CI/CD
+### Index a repository
 
-GitHub Actions despliega automáticamente en cada push a `main` via SSH.
+```bash
+curl -X POST http://localhost:8000/index \
+  -H "Content-Type: application/json" \
+  -d '{"project_name": "my-project", "git_url": "https://github.com/user/repo"}'
+```
 
-Secrets necesarios: `SSH_HOST`, `SSH_USER`, `SSH_KEY`, `DEPLOY_PATH`.
+### Query your code
 
-## Not implemented yet
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"project_name": "my-project", "query": "How does authentication work?"}'
+```
 
-- **Watchdog** — re-indexado automático al cambiar ficheros
-- Borrado de proyectos indexados
-- Saltar ficheros sin cambios en re-index (`files.file_hash` existe pero no se usa)
+---
+
+## Deployment
+
+Tested on a VPS with 4 vCores · 4 GB RAM · 120 GB NVMe. Gemma 2 2B Q4 runs comfortably within that spec.
+
+---
+
+## Roadmap
+
+- [ ] Watchdog — automatic re-indexing on file change
+- [ ] Support for additional languages (TypeScript, JavaScript, Go...)
+- [ ] Skip unchanged files on re-index using `files.file_hash`
+- [ ] List and delete indexed projects via API
+- [ ] Multi-repo queries
+
+---
+
+## License
+
+MIT
