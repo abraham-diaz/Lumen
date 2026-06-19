@@ -20,4 +20,4 @@ jobs:
           script: |
             cd "$DEPLOY_PATH"
             git pull origin main
-            docker compose up --build -d
+            docker-compose up --build -d
