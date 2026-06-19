@@ -17,3 +17,13 @@ def add_project(name, path):
             project_id = result[0]
             conn.commit()
             return project_id
+
+
+def save_description(project_id: int, description: str):
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE projects SET description = %s WHERE id = %s",
+                (description, project_id)
+            )
+            conn.commit()

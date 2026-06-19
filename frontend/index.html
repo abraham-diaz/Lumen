@@ -38,8 +38,9 @@
 
   <!-- CONSULTAR -->
   <div id="panel-query" class="panel">
-    <label for="q-name">Nombre del proyecto</label>
-    <input id="q-name" type="text" placeholder="mi-proyecto" />
+    <label for="q-project">Proyecto</label>
+    <select id="q-project" onchange="updateDescription()"><option value="">Cargando…</option></select>
+    <div id="q-description" class="project-description"></div>
 
     <label for="q-query">Pregunta</label>
     <textarea id="q-query" placeholder="¿Cómo funciona el módulo de autenticación?"></textarea>

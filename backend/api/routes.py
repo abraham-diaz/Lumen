@@ -6,9 +6,11 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from backend.query.rag import query
-from backend.ingestion.projects import add_project
+from backend.query.describe import describe_project
+from backend.ingestion.projects import add_project, save_description
 from backend.ingestion.indexer import index_file
 from backend.ingestion.git_clone import clone_repo
+from backend.db.connection import get_connection
 
 router = APIRouter()
 
@@ -26,6 +28,14 @@ class QueryRequest(BaseModel):
 class IndexRequest(BaseModel):
     project_name: str
     git_url: str
+
+@router.get("/projects")
+def list_projects():
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT name, description FROM projects ORDER BY name")
+            return [{"name": r[0], "description": r[1]} for r in cur.fetchall()]
+
 
 @router.post("/query")
 def query_endpoint(request: QueryRequest):
@@ -45,6 +55,8 @@ def index_endpoint(request: IndexRequest):
                     relative_path = os.path.relpath(file_path, temp_dir)
                     index_file(project_id, file_path, relative_path)
                     files_indexed += 1
+        description = describe_project(project_id)
+        save_description(project_id, description)
     finally:
         shutil.rmtree(temp_dir, onexc=_force_remove)
     return {"project_id": project_id, "files_indexed": files_indexed}

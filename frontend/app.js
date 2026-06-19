@@ -37,7 +37,7 @@ async function indexProject() {
 }
 
 async function queryProject() {
-  const name  = document.getElementById('q-name').value.trim();
+  const name  = document.getElementById('q-project').value;
   const query = document.getElementById('q-query').value.trim();
   const btn   = document.getElementById('q-btn');
   const out   = document.getElementById('q-result');
@@ -95,3 +95,31 @@ function showStatus(container, msg, type) {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+async function loadProjects() {
+  const sel = document.getElementById('q-project');
+  try {
+    const res = await fetch(`${API}/projects`);
+    const projects = await res.json();
+    if (projects.length === 0) {
+      sel.innerHTML = '<option value="">Sin proyectos indexados</option>';
+    } else {
+      sel.innerHTML = projects.map(p =>
+        `<option value="${escHtml(p.name)}" data-desc="${escHtml(p.description ?? '')}">${escHtml(p.name)}</option>`
+      ).join('');
+    }
+  } catch {
+    sel.innerHTML = '<option value="">Error al cargar proyectos</option>';
+  }
+  updateDescription();
+}
+
+function updateDescription() {
+  const sel = document.getElementById('q-project');
+  const desc = sel.selectedOptions[0]?.dataset.desc ?? '';
+  const div = document.getElementById('q-description');
+  div.textContent = desc;
+  div.style.display = desc ? 'block' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', loadProjects);
