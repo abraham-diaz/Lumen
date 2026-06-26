@@ -1,6 +1,7 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/abraham-diaz/Lumen/main/frontend/logo.png" alt="Lumen Logo" width="100"/>
+<div align="center">
+<img src="frontend/assets/logo.svg" alt="Lumen Logo" width="100"/>
 
 # Lumen
 
