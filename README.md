@@ -22,7 +22,7 @@ No cloud. No API keys. Everything runs on your own machine.
 
 ## Features
 
-- **Smart chunking** — splits code by function and class using `tree-sitter`, not by arbitrary line count
+- **Multi-language chunking** — splits code by function and class using `tree-sitter`; supports Python and TypeScript
 - **Hybrid search** — combines vector similarity (pgvector HNSW) and full-text search (PostgreSQL `tsvector`) merged via **Reciprocal Rank Fusion**
 - **Local LLM** — runs Gemma 2 2B (Q4_K_M GGUF) in-process via `llama-cpp-python`, no Ollama server needed
 - **Source citations** — every answer includes the exact retrieved code chunks with file, type and line numbers
@@ -39,7 +39,7 @@ No cloud. No API keys. Everything runs on your own machine.
 | Database | PostgreSQL + pgvector |
 | Embeddings | sentence-transformers · MiniLM-L6-v2 (384-dim) |
 | LLM | Gemma 2 2B · Q4_K_M GGUF · llama-cpp-python |
-| Code parsing | tree-sitter |
+| Code parsing | tree-sitter · Python · TypeScript |
 | Repo cloning | GitPython |
 | Infrastructure | Docker · Docker Compose |
 
@@ -51,7 +51,7 @@ No cloud. No API keys. Everything runs on your own machine.
 POST /index  (project_name, git_url)
 │
 ├── Clone repo → tempdir (GitPython)
-├── Walk .py files → chunk by function/class (tree-sitter)
+├── Walk .py / .ts files → chunk by function/class (tree-sitter)
 ├── Embed each chunk (MiniLM-L6-v2)
 ├── Store in PostgreSQL: projects → files → chunks
 │   ├── chunks.embedding  vector(384)  HNSW index
@@ -135,7 +135,8 @@ Tested on a VPS with 4 vCores · 4 GB RAM · 120 GB NVMe. Gemma 2 2B Q4 runs com
 ## Roadmap
 
 - [ ] Watchdog — automatic re-indexing on file change
-- [ ] Support for additional languages (TypeScript, JavaScript, Go...)
+- [x] Support for TypeScript
+- [ ] Support for additional languages (JavaScript, Go...)
 - [ ] Skip unchanged files on re-index using `files.file_hash`
 - [ ] List and delete indexed projects via API
 - [ ] Multi-repo queries

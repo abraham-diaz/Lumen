@@ -50,7 +50,7 @@ def index_endpoint(request: IndexRequest):
         project_id = add_project(request.project_name, request.git_url)
         for root, dirs, files in os.walk(temp_dir):
             for filename in files:
-                if filename.endswith(".py"):
+                if filename.endswith((".py", ".ts")):
                     file_path = os.path.join(root, filename)
                     relative_path = os.path.relpath(file_path, temp_dir)
                     index_file(project_id, file_path, relative_path)
